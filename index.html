@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fruit Crush Levels</title>
+  <title>Fruit Crush Mobile</title>
   <style>
     body {
       font-family: sans-serif;
@@ -47,7 +47,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: grab;
     }
 
     .cell span {
@@ -56,6 +55,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .selected {
+      border: 3px solid yellow;
     }
 
     button {
@@ -91,10 +94,10 @@
   </style>
 </head>
 <body>
-  <h1>🍓 Fruit Crush 🍇</h1>
+  <h1>🍓 Fruit Crush Mobile 🍇</h1>
   <div class="info">
     <div class="score">Score: <span id="score">0</span></div>
-    <div class="timer">Time: <span id="timer">60</span>s</div>
+    <div class="timer">Time: <span id="timer">2mins</span>s</div>
     <div class="level">Level: <span id="level">1</span></div>
   </div>
   <button id="pauseBtn">⏸ Pause</button>
@@ -120,19 +123,18 @@
     const fruits = ["🍓", "🍊", "🍇", "🍎", "🍉", "🍌"];
     let cells = [];
     let score = 0;
-    let timeLeft = 60;
+    let timeLeft = 120;
     let level = 1;
     let intervalSpeed = 100;
     let paused = false;
     let gameInterval, timerInterval;
 
-    let fruitBeingDragged, fruitBeingReplaced, squareIdDragged, squareIdReplaced;
+    let selectedCell = null;
 
     function createBoard() {
       for (let i = 0; i < width * width; i++) {
         const cell = document.createElement("div");
         cell.classList.add("cell");
-        cell.setAttribute("draggable", true);
         cell.setAttribute("id", i);
         const span = document.createElement("span");
         span.textContent = fruits[Math.floor(Math.random() * fruits.length)];
@@ -140,65 +142,66 @@
         grid.appendChild(cell);
         cells.push(cell);
 
-        cell.addEventListener("dragstart", dragStart);
-        cell.addEventListener("dragover", dragOver);
-        cell.addEventListener("drop", dragDrop);
-        cell.addEventListener("dragend", dragEnd);
+        cell.addEventListener("click", () => handleTap(i));
       }
     }
 
-    function dragStart() {
-      fruitBeingDragged = this.innerText;
-      squareIdDragged = parseInt(this.id);
-    }
+    function handleTap(index) {
+      if (paused) return;
+      const cell = cells[index];
 
-    function dragOver(e) {
-      e.preventDefault();
-    }
-
-    function dragDrop() {
-      fruitBeingReplaced = this.innerText;
-      squareIdReplaced = parseInt(this.id);
-      cells[squareIdDragged].querySelector("span").textContent = fruitBeingReplaced;
-      cells[squareIdReplaced].querySelector("span").textContent = fruitBeingDragged;
-    }
-
-    function dragEnd() {
-      const validMoves = [
-        squareIdDragged - 1,
-        squareIdDragged + 1,
-        squareIdDragged - width,
-        squareIdDragged + width
-      ];
-      if (squareIdReplaced && validMoves.includes(squareIdReplaced)) {
-        squareIdReplaced = null;
+      if (!selectedCell) {
+        selectedCell = index;
+        cell.classList.add("selected");
+      } else if (selectedCell === index) {
+        // Cancel selection
+        cell.classList.remove("selected");
+        selectedCell = null;
+      } else if (isAdjacent(selectedCell, index)) {
+        swapFruits(selectedCell, index);
+        selectedCell = null;
+        cells.forEach(c => c.classList.remove("selected"));
       } else {
-        cells[squareIdDragged].querySelector("span").textContent = fruitBeingDragged;
-        cells[squareIdReplaced].querySelector("span").textContent = fruitBeingReplaced;
+        // Deselect previous and select new
+        cells[selectedCell].classList.remove("selected");
+        selectedCell = index;
+        cell.classList.add("selected");
       }
+    }
+
+    function isAdjacent(a, b) {
+      const diff = Math.abs(a - b);
+      return diff === 1 && Math.floor(a / width) === Math.floor(b / width) ||
+             diff === width;
+    }
+
+    function swapFruits(a, b) {
+      const temp = cells[a].innerText;
+      cells[a].querySelector("span").textContent = cells[b].innerText;
+      cells[b].querySelector("span").textContent = temp;
     }
 
     function checkMatch(length) {
-      // Horizontal
       for (let i = 0; i < 64; i++) {
-        if (i % width > width - length) continue;
-        const row = Array.from({ length }, (_, j) => i + j);
-        const fruit = cells[i].innerText;
-        if (fruit && row.every(index => cells[index].innerText === fruit)) {
-          row.forEach(index => cells[index].querySelector("span").textContent = "");
-          matchSound.play();
-          score += length;
+        // Horizontal
+        if (i % width <= width - length) {
+          const row = Array.from({ length }, (_, j) => i + j);
+          const fruit = cells[i].innerText;
+          if (fruit && row.every(index => cells[index].innerText === fruit)) {
+            row.forEach(index => cells[index].querySelector("span").textContent = "");
+            score += length;
+            matchSound.play();
+          }
         }
-      }
-
-      // Vertical
-      for (let i = 0; i < 64 - width * (length - 1); i++) {
-        const col = Array.from({ length }, (_, j) => i + j * width);
-        const fruit = cells[i].innerText;
-        if (fruit && col.every(index => cells[index].innerText === fruit)) {
-          col.forEach(index => cells[index].querySelector("span").textContent = "");
-          matchSound.play();
-          score += length;
+        // Vertical
+        if (i < 64 - width * (length - 1)) {
+          const col = Array.from({ length }, (_, j) => i + j * width);
+          const fruit = cells[i].innerText;
+          if (fruit && col.every(index => cells[index].innerText === fruit)) {
+            col.forEach(index => cells[index].querySelector("span").textContent = "");
+            score += length;
+            matchSound.play();
+          }
         }
       }
     }
@@ -210,8 +213,7 @@
           cells[i - width].querySelector("span").textContent = "";
         }
       }
-
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < width; i++) {
         if (cells[i].innerText === "") {
           cells[i].querySelector("span").textContent = fruits[Math.floor(Math.random() * fruits.length)];
         }
@@ -225,7 +227,6 @@
       moveDown();
       scoreDisplay.textContent = score;
 
-      // Leveling every 100 points
       const newLevel = Math.floor(score / 100) + 1;
       if (newLevel !== level) {
         level = newLevel;
@@ -246,7 +247,6 @@
             clearInterval(gameInterval);
             bgMusic.pause();
             gameOverDisplay.textContent = "⏰ Time's up! Final Score: " + score;
-            document.querySelectorAll(".cell").forEach(cell => cell.setAttribute("draggable", false));
           }
         }
       }, 1000);
@@ -255,20 +255,15 @@
     function togglePause() {
       paused = !paused;
       pauseBtn.textContent = paused ? "▶ Resume" : "⏸ Pause";
-      if (paused) {
-        bgMusic.pause();
-      } else {
-        bgMusic.play();
-      }
+      if (paused) bgMusic.pause();
+      else bgMusic.play();
     }
 
-    // Start game
     createBoard();
     gameInterval = setInterval(gameLoop, intervalSpeed);
     startTimer();
     bgMusic.volume = 0.3;
     bgMusic.play();
-
     pauseBtn.addEventListener("click", togglePause);
   </script>
 </body>
